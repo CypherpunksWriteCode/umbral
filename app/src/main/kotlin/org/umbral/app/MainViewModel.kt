@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.umbral.core.config.ConfigVault
 import org.umbral.core.model.AppRule
+import org.umbral.core.model.BuiltinBridges
 import org.umbral.core.model.ModuleState
 import org.umbral.core.model.PresetId
 import org.umbral.core.model.Presets
@@ -166,6 +167,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val ok = tc.newIdentity()
         _toast.value = if (ok) "New Tor circuit requested" else "Tor control not ready"
+    }
+
+    /** Built-in bridge lists from the app asset (public Orbot/Tor Project set). */
+    fun loadBuiltinBridges(): Map<String, List<String>> {
+        val app = getApplication<Application>()
+        return runCatching {
+            val text = app.assets.open("builtin-bridges.json").bufferedReader().use { it.readText() }
+            BuiltinBridges.parse(text)
+        }.getOrDefault(emptyMap())
+    }
+
+    fun selectBuiltinBridges(setId: String, lines: List<String>) {
+        update { cfg ->
+            cfg.copy(
+                tor = cfg.tor.copy(
+                    builtinBridgeSet = setId,
+                    useBridges = true,
+                    bridges = lines.map { org.umbral.core.model.BridgeLine(it, enabled = true) }
+                )
+            )
+        }
     }
 
     fun clearToast() { _toast.value = null }

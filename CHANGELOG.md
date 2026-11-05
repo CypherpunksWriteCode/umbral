@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.4.0] — 2026-11-06
+
+### Added
+- Tor bridges: built-in public sets (Snowflake, obfs4, meek_lite — the same
+  list Orbot ships, from Tor Project/Guardian Project), selectable in the UI;
+  custom paste stays available. Parser tested.
+- Crash reporter: uncaught exceptions are saved locally and shown on the
+  Diagnostics screen (never uploaded) — field debugging without adb.
+- Dashboard: plain-language "how do I use this" card.
+
+### Fixed
+- VpnService: fixed illegal mixing of allow/disallow app lists when
+  include-only mode is used (hard crash on start for that configuration).
+- UI: FilterChip import, LazyColumn scoping.
+
 ## [0.3.0] — 2026-11-06
 
 ### Added

@@ -81,9 +81,37 @@ data class TorConfig(
     val enabled: Boolean = false,
     val bridges: List<BridgeLine> = emptyList(),
     val useBridges: Boolean = false,
+    /** Selected built-in bridge set id (see BuiltinBridges), "" = custom list only. */
+    val builtinBridgeSet: String = "",
     /** Extra raw torrc lines, validated against a safe allow-list. */
     val extraTorrc: List<String> = emptyList()
 )
+
+/**
+ * Built-in public bridge lists (same distribution list Orbot ships, sourced
+ * from Tor Project / Guardian Project). The JSON asset lives in the app;
+ * parsing is pure and tested.
+ */
+object BuiltinBridges {
+    val SETS = listOf(
+        Set("snowflake", "Snowflake (built-in)", "WebRTC-domain-fronted; hardest to block, needs no invite"),
+        Set("obfs4", "obfs4 (built-in)", "Public obfs4 bridges; moderate censorship resistance"),
+        Set("meek", "meek_lite (built-in)", "CDN-fronted; slow, works in harsh networks")
+    )
+
+    data class Set(val id: String, val label: String, val description: String)
+
+    /** Parses the builtin-bridges.json asset; returns id -> bridge lines. */
+    fun parse(jsonText: String): Map<String, List<String>> {
+        val obj = kotlinx.serialization.json.Json.parseToJsonElement(jsonText).let { it as kotlinx.serialization.json.JsonObject }
+        val out = LinkedHashMap<String, List<String>>()
+        for ((k, v) in obj) {
+            val arr = (v as? kotlinx.serialization.json.JsonArray) ?: continue
+            out[k] = arr.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        }
+        return out
+    }
+}
 
 /** Upstream for non-Tor tunnelled traffic. */
 @Serializable

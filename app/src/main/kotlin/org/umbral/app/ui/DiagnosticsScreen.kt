@@ -52,9 +52,10 @@ fun DiagnosticsScreen(vm: MainViewModel) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Connections") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("DNS") })
             Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Tor log") })
+            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Crash") })
         }
 
-        OutlinedButton(onClick = { vm.diag.clear() }) { Text("Clear") }
+        OutlinedButton(onClick = { vm.diag.clear(); org.umbral.core.vpn.CrashReporter.clear() }) { Text("Clear") }
 
         when (tab) {
             0 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -89,9 +90,33 @@ fun DiagnosticsScreen(vm: MainViewModel) {
                     }
                 }
             }
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            2 -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(vm.diag.recentTorLog().take(200)) { line ->
                     Text(line, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(4.dp))
+                }
+            }
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val reports = org.umbral.core.vpn.CrashReporter.reports()
+                if (reports.isEmpty()) {
+                    item {
+                        Text(
+                            "No crashes recorded. If the app died, launch it again and check here — " +
+                                "the stack trace is saved locally and never uploaded.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+                items(reports) { f ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(8.dp)) {
+                            Text(f.name, style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                f.readText().take(4000),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
         }

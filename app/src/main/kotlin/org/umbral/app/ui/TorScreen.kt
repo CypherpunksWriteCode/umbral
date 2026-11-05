@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.umbral.app.MainViewModel
 import org.umbral.core.model.BridgeBatch
+import org.umbral.core.model.BuiltinBridges
 import org.umbral.core.model.TorConfig
 
 @Composable
@@ -68,17 +70,61 @@ fun TorScreen(vm: MainViewModel) {
 
         Text("Bridges", style = MaterialTheme.typography.titleMedium)
         Text(
-            "One per line: <transport> <address:port> <fingerprint> [args]. " +
-                "Supported: obfs4, snowflake, webtunnel, meek_lite, obfs2/3, scramblesuit, dnstt " +
-                "(transports run via IPtProxy). Paste a whole list at once.",
+            "Bridges hide the fact you use Tor from the local network. Pick a built-in set " +
+                "or paste your own list (BridgesDB, friends). One per line: " +
+                "<transport> <address:port> <fingerprint> [args].",
             style = MaterialTheme.typography.bodySmall
         )
         SwitchRow(
             "Use bridges",
-            "Tor connects only through the bridges below (helps against direct Tor blocking).",
+            "Tor connects only through bridges instead of public relays.",
             cfg.tor.useBridges
         ) { on -> vm.update { it.copy(tor = it.tor.copy(useBridges = on)) } }
 
+        if (cfg.tor.useBridges) {
+            Text("Source", style = MaterialTheme.typography.titleSmall)
+            val builtin = remember { vm.loadBuiltinBridges() }
+            BuiltinBridges.SETS.forEach { set ->
+                Card(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                    Row(
+                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(set.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(set.description, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        FilterChip(
+                            selected = cfg.tor.builtinBridgeSet == set.id,
+                            onClick = { vm.selectBuiltinBridges(set.id, builtin[set.id] ?: emptyList()) },
+                            label = { Text(if (cfg.tor.builtinBridgeSet == set.id) "Active" else "Use") }
+                        )
+                    }
+                }
+            }
+            Card(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Custom list", style = MaterialTheme.typography.bodyLarge)
+                        Text("Your own bridge lines below", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    FilterChip(
+                        selected = cfg.tor.builtinBridgeSet == "",
+                        onClick = { vm.update { it.copy(tor = it.tor.copy(builtinBridgeSet = "")) } },
+                        label = { Text(if (cfg.tor.builtinBridgeSet == "") "Active" else "Use") }
+                    )
+                }
+            }
+        }
+
+        if (cfg.tor.bridges.isNotEmpty()) {
+            Text("Active bridges (${cfg.tor.bridges.size})", style = MaterialTheme.typography.titleSmall)
+        }
         cfg.tor.bridges.forEachIndexed { i, b ->
             Card(Modifier.fillMaxWidth()) {
                 Row(
@@ -90,25 +136,27 @@ fun TorScreen(vm: MainViewModel) {
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall
                     )
-                    OutlinedButton(onClick = {
-                        vm.update { c ->
-                            c.copy(tor = c.tor.copy(bridges = c.tor.bridges.filterIndexed { j, _ -> j != i }))
-                        }
-                    }) { Text("Remove") }
+                    if (cfg.tor.builtinBridgeSet == "") {
+                        OutlinedButton(onClick = {
+                            vm.update { c ->
+                                c.copy(tor = c.tor.copy(bridges = c.tor.bridges.filterIndexed { j, _ -> j != i }))
+                            }
+                        }) { Text("Remove") }
+                    }
                 }
             }
         }
 
-        var batch by remember { mutableStateOf("") }
-        var batchResult by remember { mutableStateOf<String?>(null) }
-        OutlinedTextField(
-            value = batch,
-            onValueChange = { batch = it },
-            label = { Text("Paste bridge list (one per line)") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (cfg.tor.builtinBridgeSet == "") {
+            var batch by remember { mutableStateOf("") }
+            var batchResult by remember { mutableStateOf<String?>(null) }
+            OutlinedTextField(
+                value = batch,
+                onValueChange = { batch = it },
+                label = { Text("Paste bridge list (one per line)") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3
+            )
             Button(onClick = {
                 val res = BridgeBatch.parse(batch)
                 if (res.bridges.isNotEmpty()) {
@@ -123,9 +171,9 @@ fun TorScreen(vm: MainViewModel) {
                     else -> "Added ${res.bridges.size}, rejected ${res.errors.size}:\n" + res.errors.joinToString("\n")
                 }
             }) { Text("Add batch") }
-        }
-        batchResult?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            batchResult?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         if (cfg.advancedMode) {

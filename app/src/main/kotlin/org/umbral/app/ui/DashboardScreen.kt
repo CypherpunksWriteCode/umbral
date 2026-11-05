@@ -61,9 +61,9 @@ fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRou
                 )
                 Text(
                     when {
-                        vpnActive && cfg.tor.enabled -> "All tunnelled traffic routes through Tor. DNS is encrypted."
-                        vpnActive -> "Encrypted DNS + application firewall active. Traffic leaves directly."
-                        else -> "No traffic is being filtered or routed."
+                        vpnActive && cfg.tor.enabled -> "All tunneled traffic goes through Tor. DNS is encrypted."
+                        vpnActive -> "Firewall + encrypted DNS active. Traffic leaves directly (not anonymous)."
+                        else -> "Right now nothing is filtered. Tap Start — you'll confirm one VPN permission."
                     },
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -75,11 +75,26 @@ fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRou
                 }
                 if (needsRestart && vpnActive) {
                     Text(
-                        "Configuration changed. Restart the tunnel to apply.",
+                        "Settings changed. Restart the tunnel to apply.",
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("How do I use this?", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "1. Apps tab: choose which apps go through the tunnel (Tunnel), bypass it " +
+                        "(Bypass), or lose network (Block).\n" +
+                        "2. Net tab: pick where tunneled traffic goes — Direct, Tor, I2P or your " +
+                        "proxy — and how DNS is resolved.\n" +
+                        "3. Diag tab: see what actually happens.\n" +
+                        "Presets below set the common combinations in one tap.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
 

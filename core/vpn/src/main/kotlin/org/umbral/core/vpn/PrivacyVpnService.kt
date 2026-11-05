@@ -316,15 +316,20 @@ class PrivacyVpnService : VpnService() {
             .addRoute("0.0.0.0", 0)
             .addRoute("::", 0)
         try {
-            // Never tunnel ourselves: our sockets (DoH/DoT, relay, Tor upstream)
-            // must leave via the real interface, outside the VPN.
-            b.addDisallowedApplication(packageName)
-            cfg.vpn.bypassUids.forEach { uid ->
-                uidToPackages(uid).forEach { b.addDisallowedApplication(it) }
-            }
+            // NOTE: Android forbids mixing addAllowedApplication and
+            // addDisallowedApplication. Allow-list mode is exclusive: when the
+            // user picked includeOnly UIDs, everything else (including us) is
+            // already excluded — adding disallow(self) would throw.
             if (cfg.vpn.includeOnlyUids.isNotEmpty()) {
                 cfg.vpn.includeOnlyUids.forEach { uid ->
                     uidToPackages(uid).forEach { b.addAllowedApplication(it) }
+                }
+            } else {
+                // Never tunnel ourselves: our sockets (DoH/DoT, relay, Tor, i2pd
+                // upstreams) must leave via the real interface, outside the VPN.
+                b.addDisallowedApplication(packageName)
+                cfg.vpn.bypassUids.forEach { uid ->
+                    uidToPackages(uid).forEach { b.addDisallowedApplication(it) }
                 }
             }
         } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
