@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+.kotlin/
+
+# NixOS toolchain artifacts (rebuild via shell.nix / scripts)
+.toolchain/
+result
+
+# Signing — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Test output
+*.exec
