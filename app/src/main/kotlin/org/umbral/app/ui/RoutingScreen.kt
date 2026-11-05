@@ -58,6 +58,37 @@ fun RoutingScreen(vm: MainViewModel) {
             cfg.vpn.strictNoFallback
         ) { on -> vm.update { it.copy(vpn = it.vpn.copy(strictNoFallback = on)) } }
 
+        Text("Anti-DPI (TLS ClientHello fragmentation)", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Splits the first TLS record of every tunneled HTTPS connection into small TCP writes. " +
+                "Bytes on the wire do not change (the TLS handshake stays valid), but packet-inspecting " +
+                "middleboxes that do not reassemble segments lose sight of the SNI hostname. " +
+                "Real SNI *rewriting* is impossible without a MITM proxy (it breaks the Finished MAC) — " +
+                "this is the honest, working variant of the trick.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        SwitchRow(
+            "Fragment ClientHello",
+            "Recommended chunk size 8 bytes. Slight latency cost, no TLS breakage.",
+            cfg.antiDpi.enabled
+        ) { on -> vm.update { it.copy(antiDpi = it.antiDpi.copy(enabled = on)) } }
+        if (cfg.antiDpi.enabled) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 4, 8, 16).forEach { size ->
+                    FilterChip(
+                        selected = cfg.antiDpi.chunkSize == size,
+                        onClick = { vm.update { it.copy(antiDpi = it.antiDpi.copy(chunkSize = size)) } },
+                        label = { Text("$size B") }
+                    )
+                }
+            }
+        }
+        Text(
+            "Observed SNI hostnames appear in Diagnostics → Connections.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
         if (cfg.defaultRoute == RouteAction.PROXY || cfg.advancedMode) {
             Text("Custom SOCKS5 proxy", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

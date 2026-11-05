@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.3.0] — 2026-11-06
+
+### Added
+- Anti-DPI: TLS ClientHello fragmentation at the relay (handshake-safe,
+  verified against a real TLS server in tests) + SNI observation in
+  diagnostics. In-place SNI rewriting is documented as impossible without
+  MITM (Finished MAC) — we ship the honest variant.
+- Tor bridges: batch paste (multi-line, validated per line, deduplicated).
+- Relay port fallback (bind 10808..10813), crash-hardened tunnel start:
+  any startup failure now surfaces as an error and stops the service
+  instead of killing the process.
+- UI: bottom bar reduced to 5 tabs; DNS/Tor/I2P/Routing merged into a
+  "Net" screen with internal tabs.
+- Repository slimmed down: corporate-flavored docs removed (CoC,
+  contributing boilerplate, marketing comparisons); engineering docs kept.
+
 ## [0.2.0] — 2026-11-05
 
 ### Added

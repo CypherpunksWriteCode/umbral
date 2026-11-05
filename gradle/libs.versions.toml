@@ -42,6 +42,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+okhttp-client = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 tor-android = { group = "info.guardianproject", name = "tor-android", version.ref = "torAndroid" }
 jtorctl = { group = "info.guardianproject", name = "jtorctl", version.ref = "jtorctl" }
 iptproxy = { group = "com.netzarchitekten", name = "IPtProxy", version.ref = "iptproxy" }

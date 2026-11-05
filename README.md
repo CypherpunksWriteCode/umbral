@@ -30,7 +30,8 @@ release. It is NOT audited. Do not bet your life on it.
   Central, BSD-3) with pluggable transports via IPtProxy (obfs4, snowflake,
   webtunnel, meek_lite). Route the whole tunnel through Tor with one preset;
   DNS can be resolved through Tor as well (remote DNS, see below). Circuit
-  renewal (`NEWNYM`), bootstrap progress, bridge management.
+  renewal (`NEWNYM`), bootstrap progress. Bridges can be pasted in batches
+  (one per line, validated, deduplicated) or added one by one.
 - **Custom SOCKS5 upstream** for the whole tunnel, with username/password
   support, hostnames always sent to the proxy (remote DNS).
 - **I2P (i2pd)** — the real Purple I2P router (upstream release 3.0.0
@@ -41,9 +42,16 @@ release. It is NOT audited. Do not bet your life on it.
   our own SOCKS5 client (see tests).
 - **Strict failure mode (default on)** — if Tor or the configured proxy is
   unavailable, connections are **refused**, never silently sent directly.
+- **Anti-DPI (TLS ClientHello fragmentation)** — the first TLS record of
+  tunneled HTTPS connections is split into small TCP writes; SNI hostnames
+  become invisible to middleboxes that do not reassemble segments. Bytes on
+  the wire do not change, so the TLS handshake stays valid (verified by a
+  real-handshake test). Observed SNI names are shown in Diagnostics.
+  Honest note: *rewriting* SNI is impossible without a MITM proxy (it breaks
+  the Finished MAC) — this is the working variant of the trick.
 - **Diagnostics you can trust** — connection log (what was blocked/passed),
-  DNS query log (which upstream, cached or not), Tor log. The screens say
-  explicitly what the app *cannot* observe.
+  DNS query log (which upstream, cached or not), Tor log, observed SNI. The
+  screens say explicitly what the app *cannot* observe.
 - **Simple and Advanced UI modes** — Material 3 / Jetpack Compose.
 
 ## What it does NOT do (honest limitations)
@@ -161,16 +169,20 @@ egress manifest — every outbound connection the app can make.
 
 This project is licensed under **GPLv3 or later** ([LICENSE](LICENSE)).
 
-## Threat model & security
+## Threat model
 
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) — what Umbral defends against, and against what it cannot.
-- [docs/SECURITY.md](docs/SECURITY.md) and [SECURITY.md](SECURITY.md) — engineering rules and reporting.
+
+Vulnerabilities: open a private security advisory on the repository, or an
+issue marked `security`. Do not open public issues for exploitable bugs.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Small, reviewable, tested PRs.
-All crypto is standard (AES-256-GCM, PBKDF2-HMAC-SHA256, TLS via platform
-stacks); we do not invent cryptography.
+Small, reviewable, tested PRs. Every behavior change ships with a test where
+testable. No new permissions without written justification; no analytics or
+tracking — ever. All crypto is standard (AES-256-GCM, PBKDF2-HMAC-SHA256,
+TLS via platform stacks); we do not invent cryptography. No code of conduct:
+be excellent to each other, talk about code.
 
 ## Roadmap
 

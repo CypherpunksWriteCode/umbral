@@ -21,7 +21,9 @@ compilation and review, not runtime) · **PARTIALLY IMPLEMENTED** ·
 | SOCKS5 client (RFC 1928/1929, remote DNS ATYP) | IMPLEMENTED AND TESTED | 2 tests |
 | SOCKS5 relay (loopback, routing dialer, refuse semantics, UID filter) | IMPLEMENTED AND TESTED | 3 end-to-end socket tests (direct/blocked/upstream-down) |
 | /proc/net parser | IMPLEMENTED AND TESTED | 2 tests (fallback path for API<29 class devices; minSdk 29 makes this auxiliary) |
-| VPN service (TUN pumps, socketpair↔hev, DNS responder, notification, boot) | IMPLEMENTED, NOT FULLY TESTED | **not run on a device/emulator in this environment** |
+| VPN service (TUN pumps, socketpair↔hev, DNS responder, notification, boot) | IMPLEMENTED, NOT FULLY TESTED | crash-hardened start (failures surface instead of crashing) |
+| Anti-DPI ClientHello fragmentation + SNI observation | IMPLEMENTED AND TESTED | parser unit tests + real TLS handshake through fragmenting relay |
+| Tor bridge batch paste parser | IMPLEMENTED AND TESTED | 3 unit tests (validation, dedupe, errors) | **not run on a device/emulator in this environment** |
 | Tor controller (TorService lifecycle, status, bootstrap, NEWNYM, torrc, bridges via IPtProxy) | IMPLEMENTED, NOT FULLY TESTED | API surface verified against tor-android sources; runtime not exercised here |
 | I2P: i2pd.conf generator (allow-listed options, loopback-only services) | IMPLEMENTED AND TESTED | 4 unit tests + **real-daemon boot test** (nixpkgs i2pd runs the generated config; SOCKS + webconsole verified; catches invalid options) |
 | I2P: live end-to-end (our SOCKS5 client → i2pd → I2P network → eepsite HTTP 200) | TESTED (opt-in) | `UMBRAL_I2PD_LIVE=1`, network+minutes required; executed successfully in this iteration (zzz.i2p) |

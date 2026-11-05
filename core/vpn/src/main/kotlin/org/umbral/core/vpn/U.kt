@@ -100,6 +100,12 @@ class U private constructor(context: Context) {
                         e.action, true, e.reason
                     )
                 )
+                is SocksRelayServer.RelayEvent.SniObserved -> onConnection(
+                    ConnectionEvent(
+                        System.currentTimeMillis(), -1, "TLS", "tun", "${e.host}:${e.port}",
+                        null, false, "SNI: ${e.sni}"
+                    )
+                )
                 is SocksRelayServer.RelayEvent.Closed -> Unit
             }
         }

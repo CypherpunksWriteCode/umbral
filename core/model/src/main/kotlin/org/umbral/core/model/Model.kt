@@ -136,6 +136,16 @@ data class I2pConfig(
 }
 
 @Serializable
+data class AntiDpiConfig(
+    /** Fragment TLS ClientHello across TCP writes (anti-DPI, handshake-safe). */
+    val enabled: Boolean = false,
+    /** Bytes per fragment (small = harder for DPI, slower). */
+    val chunkSize: Int = 8
+) {
+    init { require(chunkSize in 1..64) { "chunkSize" } }
+}
+
+@Serializable
 data class UmbralConfig(
     val defaultRoute: RouteAction = RouteAction.DIRECT,
     val appRules: Map<String, AppRule> = emptyMap(),
@@ -143,10 +153,42 @@ data class UmbralConfig(
     val tor: TorConfig = TorConfig(),
     val i2p: I2pConfig = I2pConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
+    val antiDpi: AntiDpiConfig = AntiDpiConfig(),
     val vpn: VpnConfig = VpnConfig(),
     val autoStartOnBoot: Boolean = false,
     val advancedMode: Boolean = false
 )
+
+/** Parse a pasted batch of bridge lines. Returns good lines + per-line errors. */
+object BridgeBatch {
+    val KNOWN = setOf("obfs2", "obfs3", "obfs4", "scramblesuit", "meek_lite", "snowflake", "webtunnel", "dnstt")
+
+    data class Result(val bridges: List<BridgeLine>, val errors: List<String>)
+
+    fun parse(text: String): Result {
+        val bridges = ArrayList<BridgeLine>()
+        val errors = ArrayList<String>()
+        text.lineSequence().forEachIndexed { idx, raw ->
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) return@forEachIndexed
+            val transport = line.split(Regex("\\s+")).firstOrNull()?.lowercase() ?: ""
+            if (transport !in KNOWN) {
+                errors.add("line ${idx + 1}: unknown transport '$transport' (need ${KNOWN.joinToString("/")})")
+                return@forEachIndexed
+            }
+            val rest = line.split(Regex("\\s+"), limit = 2).getOrNull(1)?.trim() ?: ""
+            if (rest.isEmpty() || rest.split(Regex("\\s+")).size < 2) {
+                errors.add("line ${idx + 1}: expected '<transport> <address[:port]> <fingerprint> [args]'")
+                return@forEachIndexed
+            }
+            bridges.add(BridgeLine(line = line))
+        }
+        // dedupe
+        val seen = HashSet<String>()
+        val unique = bridges.filter { seen.add(it.line) }
+        return Result(unique, errors)
+    }
+}
 
 /** Preset profiles offered in the UI. Each is a full config transformation. */
 enum class PresetId { PRIVACY_FIRST, TOR_ROUTING, I2P_ROUTING, DNS_FIREWALL, CUSTOM }

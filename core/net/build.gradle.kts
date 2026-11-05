@@ -13,4 +13,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(project(":core:i2p"))
+    testImplementation(libs.okhttp.client)
+    testImplementation(libs.okhttp.tls)
+    testImplementation(libs.mockwebserver)
 }

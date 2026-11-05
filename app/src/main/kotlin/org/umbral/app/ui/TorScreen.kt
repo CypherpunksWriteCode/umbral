@@ -24,14 +24,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.umbral.app.MainViewModel
-import org.umbral.core.model.BridgeLine
+import org.umbral.core.model.BridgeBatch
 import org.umbral.core.model.TorConfig
 
 @Composable
 fun TorScreen(vm: MainViewModel) {
     val cfg by vm.config.collectAsState()
     val vpnActive by vm.vpnActive.collectAsState()
-    var newBridge by remember { mutableStateOf("") }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -69,9 +68,9 @@ fun TorScreen(vm: MainViewModel) {
 
         Text("Bridges", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Bridge lines are passed to tor verbatim, e.g. " +
-                "obfs4 203.0.113.1:443 cert=… iat-mode=0 — supported transports: " +
-                "obfs4, snowflake, webtunnel, meek_lite (via IPtProxy).",
+            "One per line: <transport> <address:port> <fingerprint> [args]. " +
+                "Supported: obfs4, snowflake, webtunnel, meek_lite, obfs2/3, scramblesuit, dnstt " +
+                "(transports run via IPtProxy). Paste a whole list at once.",
             style = MaterialTheme.typography.bodySmall
         )
         SwitchRow(
@@ -100,21 +99,33 @@ fun TorScreen(vm: MainViewModel) {
             }
         }
 
+        var batch by remember { mutableStateOf("") }
+        var batchResult by remember { mutableStateOf<String?>(null) }
+        OutlinedTextField(
+            value = batch,
+            onValueChange = { batch = it },
+            label = { Text("Paste bridge list (one per line)") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = newBridge,
-                onValueChange = { newBridge = it },
-                label = { Text("Bridge line") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
             Button(onClick = {
-                val line = newBridge.trim()
-                if (line.isNotEmpty()) {
-                    vm.update { c -> c.copy(tor = c.tor.copy(bridges = c.tor.bridges + BridgeLine(line), useBridges = true)) }
-                    newBridge = ""
+                val res = BridgeBatch.parse(batch)
+                if (res.bridges.isNotEmpty()) {
+                    vm.update { c ->
+                        c.copy(tor = c.tor.copy(bridges = c.tor.bridges + res.bridges, useBridges = true))
+                    }
+                    batch = ""
                 }
-            }) { Text("Add") }
+                batchResult = when {
+                    res.bridges.isEmpty() && res.errors.isEmpty() -> "Nothing to add"
+                    res.errors.isEmpty() -> "Added ${res.bridges.size} bridges"
+                    else -> "Added ${res.bridges.size}, rejected ${res.errors.size}:\n" + res.errors.joinToString("\n")
+                }
+            }) { Text("Add batch") }
+        }
+        batchResult?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         if (cfg.advancedMode) {

@@ -38,6 +38,7 @@ import org.umbral.core.net.filter.Verdict
 import org.umbral.core.net.pkt.IpCodec
 import org.umbral.core.net.socks.Socks5Client
 import org.umbral.core.net.socks.SocksRelayServer
+import org.umbral.core.net.tls.TlsClientHello
 import org.umbral.core.net.uid.ProcNet
 import org.umbral.core.tor.TorController
 import java.io.File
@@ -117,7 +118,19 @@ class PrivacyVpnService : VpnService() {
             }
             else -> {
                 startForegroundWithType()
-                serviceScope.launch { startTunnel() }
+                serviceScope.launch {
+                    try {
+                        startTunnel()
+                    } catch (t: Throwable) {
+                        // A failure to start must never crash the process.
+                        U.mgr(applicationContext).diagnostics.onVpnError(
+                            "tunnel start failed: ${t.message ?: t.javaClass.simpleName}"
+                        )
+                        android.util.Log.e("Umbral", "tunnel start failed", t)
+                        stopTunnel()
+                        stopSelf()
+                    }
+                }
             }
         }
         return START_STICKY
@@ -195,10 +208,18 @@ class PrivacyVpnService : VpnService() {
             router = { _, _ -> pol.resolve(-1, netKind(), true) },
             dialer = { host, port, action -> dial(host, port, action) },
             onEvent = { ev -> U.mgr(ctx).diagnostics.onRelayEvent(ev) },
-            acceptFilter = { sock -> isOwnProcessConnection(sock) }
+            acceptFilter = { sock -> isOwnProcessConnection(sock) },
+            tlsFirstRecord = if (currentConfig.antiDpi.enabled) { _, _, record ->
+                runCatching {
+                    val p = org.umbral.core.net.tls.TlsClientHello.parse(record)
+                    TlsClientHello.fragmentPlan(p.recordLength, p.sniOffset, p.sniLength, currentConfig.antiDpi.chunkSize)
+                        .map { (off, len) -> record.copyOfRange(off, off + len) }
+                }.getOrNull()
+            } else null
         )
         relay = r
         r.start()
+        val relayPort = r.port()
 
         val vpn = establishInterface(currentConfig)
         if (vpn == null) {
@@ -230,7 +251,7 @@ class PrivacyVpnService : VpnService() {
               ipv4: $VPN_ADDRESS_V4
               ipv6: '$VPN_ADDRESS_V6'
             socks5:
-              port: $RELAY_PORT
+              port: $relayPort
               address: 127.0.0.1
               udp: 'udp'
             misc:
@@ -583,13 +604,12 @@ class PrivacyVpnService : VpnService() {
     }
 
     private fun buildNotification(): Notification {
-        val open = PendingIntent.getActivity(
-            this, 0,
-            packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val launch = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val open = if (launch != null) {
+            PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        } else null
         val stop = PendingIntent.getService(
             this, 1,
             Intent(this, PrivacyVpnService::class.java).setAction(ACTION_STOP),
@@ -600,7 +620,7 @@ class PrivacyVpnService : VpnService() {
             .setContentTitle("Umbral active")
             .setContentText("Tunnel, firewall and encrypted DNS are running.")
             .setOngoing(true)
-            .setContentIntent(open)
+            .apply { if (open != null) setContentIntent(open) }
             .addAction(0, "Stop", stop)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()

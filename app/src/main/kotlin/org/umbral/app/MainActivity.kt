@@ -41,6 +41,7 @@ import org.umbral.app.ui.DashboardScreen
 import org.umbral.app.ui.DiagnosticsScreen
 import org.umbral.app.ui.DnsScreen
 import org.umbral.app.ui.I2pScreen
+import org.umbral.app.ui.NetScreen
 import org.umbral.app.ui.RoutingScreen
 import org.umbral.app.ui.SettingsScreen
 import org.umbral.app.ui.TorScreen
@@ -97,9 +98,7 @@ private fun Root(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit) {
     val tabs = listOf(
         Tab("dashboard", "Home", Icons.Filled.Home),
         Tab("apps", "Apps", Icons.Filled.Apps),
-        Tab("dns", "DNS", Icons.Filled.Dns),
-        Tab("tor", "Tor", Icons.Filled.Security),
-        Tab("i2p", "I2P", Icons.Filled.Public),
+        Tab("net", "Net", Icons.Filled.Dns),
         Tab("diagnostics", "Diag", Icons.Filled.Troubleshoot),
         Tab("settings", "Setup", Icons.Filled.Settings)
     )
@@ -143,6 +142,7 @@ private fun Root(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit) {
         ) {
             composable("dashboard") { DashboardScreen(vm, onToggleVpn) { nav.navigate("routing") } }
             composable("apps") { AppsScreen(vm) }
+            composable("net") { NetScreen(vm) }
             composable("dns") { DnsScreen(vm) }
             composable("tor") { TorScreen(vm) }
             composable("i2p") { I2pScreen(vm) }
