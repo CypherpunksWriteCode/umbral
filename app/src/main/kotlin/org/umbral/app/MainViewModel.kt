@@ -199,12 +199,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun torState(): Triple<String, Int, Int> =
         Triple(diag.torDaemon, diag.torBootstrap, diag.torSocksPort)
 
+    data class I2pUiState(val router: String, val socksReady: Boolean, val socksPort: Int)
+
+    fun i2pState(): I2pUiState =
+        I2pUiState(diag.i2pRouter, diag.i2pSocksReady, diag.i2pSocksPort)
+
     fun moduleStates(cfg: UmbralConfig): Map<String, ModuleState> = mapOf(
         "vpn" to if (vpnActive.value) ModuleState.ACTIVE else ModuleState.OFF,
         "dns" to if (vpnActive.value) ModuleState.ACTIVE else ModuleState.OFF,
         "tor" to when {
             !cfg.tor.enabled -> ModuleState.OFF
             vpnActive.value && diag.torSocksPort > 0 -> ModuleState.ACTIVE
+            vpnActive.value -> ModuleState.STARTING
+            else -> ModuleState.OFF
+        },
+        "i2p" to when {
+            !cfg.i2p.enabled -> ModuleState.OFF
+            vpnActive.value && diag.i2pSocksReady -> ModuleState.ACTIVE
             vpnActive.value -> ModuleState.STARTING
             else -> ModuleState.OFF
         }

@@ -90,6 +90,7 @@ fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRou
             "Tor routing (global route: ${cfg.defaultRoute.name.lowercase()})",
             states["tor"] ?: ModuleState.OFF
         )
+        if (cfg.i2p.enabled) ModuleRow("I2P router (i2pd)", states["i2p"] ?: ModuleState.OFF)
         if (cfg.tor.enabled && vpnActive) {
             val (daemon, boot, socks) = vm.torState()
             Text("Tor: $daemon  bootstrap: $boot%  SOCKS: ${if (socks > 0) socks else "—"}",
@@ -117,6 +118,7 @@ fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRou
         Text("Presets", style = MaterialTheme.typography.titleMedium)
         PresetChip("Privacy First", "Encrypted DNS + firewall, direct traffic", PresetId.PRIVACY_FIRST, vm, cfg.tor.enabled || cfg.defaultRoute != RouteAction.DIRECT)
         PresetChip("Tor Routing", "Everything tunneled through Tor", PresetId.TOR_ROUTING, vm, cfg.defaultRoute != RouteAction.TOR)
+        PresetChip("I2P Routing", "Tunnelled traffic through I2P (i2pd)", PresetId.I2P_ROUTING, vm, cfg.defaultRoute != RouteAction.I2P)
         PresetChip("DNS Firewall", "Encrypted DNS + firewall only", PresetId.DNS_FIREWALL, vm, false)
 
         Spacer(Modifier.height(8.dp))

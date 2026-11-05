@@ -9,14 +9,15 @@ package org.umbral.core.model
  *  - If includeOnlyUids is non-empty, only those UIDs are tunneled.
  *  - App-specific rule (per network kind) wins over the default route.
  *  - Unknown UIDs get the default route.
- *  - [RouteAction.TOR] when Tor is not running and strictNoFallback is set
- *    degrades to BLOCK, never to DIRECT. This is the single most important
- *    safety property of the engine.
+ *  - [RouteAction.TOR]/[RouteAction.I2P]/[RouteAction.PROXY] when the upstream
+ *    is not running and strictNoFallback is set degrades to BLOCK, never to
+ *    DIRECT. This is the single most important safety property of the engine.
  */
 class RoutingPolicy(
     private val config: UmbralConfig,
     private val torAvailable: () -> Boolean,
-    private val proxyAvailable: () -> Boolean
+    private val proxyAvailable: () -> Boolean,
+    private val i2pAvailable: () -> Boolean = { false }
 ) {
     fun resolve(uid: Int, net: NetKind, tunneled: Boolean): RouteDecision {
         if (!tunneled) {
@@ -30,6 +31,12 @@ class RoutingPolicy(
             action = if (config.vpn.strictNoFallback) RouteAction.BLOCK
             else RouteAction.DIRECT
             reason += "; Tor unavailable -> " +
+                (if (config.vpn.strictNoFallback) "blocked (strict, no fallback)" else "FELL BACK TO DIRECT (strict mode off)")
+        }
+        if (action == RouteAction.I2P && !i2pAvailable()) {
+            action = if (config.vpn.strictNoFallback) RouteAction.BLOCK
+            else RouteAction.DIRECT
+            reason += "; I2P unavailable -> " +
                 (if (config.vpn.strictNoFallback) "blocked (strict, no fallback)" else "FELL BACK TO DIRECT (strict mode off)")
         }
         if (action == RouteAction.PROXY) {

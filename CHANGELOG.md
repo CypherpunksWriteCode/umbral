@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.2.0] — 2026-11-05
+
+### Added
+- **I2P module**: bundled i2pd router (Purple I2P 3.0.0 release binaries,
+  BSD-3) executed in-app; loopback SOCKS/HTTP proxies, webconsole, optional
+  SAM; transit participation off by default; `RouteAction.I2P` + "I2P
+  Routing" preset + dedicated UI screen with advanced options (ports,
+  outproxy, allow-listed extra i2pd.conf lines).
+- I2P config builder validated against the real daemon (boot test) and a
+  live end-to-end test (our SOCKS5 client fetches zzz.i2p through a fresh
+  router) — both executed in this iteration.
+- Per-ABI APK splits (arm64 build ≈80 MB vs 195 MB universal v0.1).
+- Install-corruption guidance + SHA-256 workflow in README.
+
+### Fixed
+- (docs) I2P research section corrected: i2p.android.base is archived, but
+  PurpleI2P/i2pd-android actively ships official Android binaries.
+
 ## [0.1.0] — 2026-11-05
 
 First public source release. Codename **Umbral**.

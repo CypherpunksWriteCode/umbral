@@ -48,6 +48,7 @@ fun RoutingScreen(vm: MainViewModel) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RouteChip("Direct", RouteAction.DIRECT, cfg, vm)
             RouteChip("Tor", RouteAction.TOR, cfg, vm)
+            RouteChip("I2P", RouteAction.I2P, cfg, vm)
             RouteChip("Proxy", RouteAction.PROXY, cfg, vm)
         }
 
@@ -113,7 +114,8 @@ private fun RouteChip(label: String, action: RouteAction, cfg: org.umbral.core.m
             vm.update { c ->
                 c.copy(
                     defaultRoute = action,
-                    tor = if (action == RouteAction.TOR) c.tor.copy(enabled = true) else c.tor
+                    tor = if (action == RouteAction.TOR) c.tor.copy(enabled = true) else c.tor,
+                    i2p = if (action == RouteAction.I2P) c.i2p.copy(enabled = true) else c.i2p
                 )
             }
         },

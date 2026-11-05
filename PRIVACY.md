@@ -26,6 +26,8 @@ reporting, no update checking, no "phoning home" of any kind.
 | 5 | VPN active, route Tor | Tor guard/relay/bridge endpoints | Tunnelled traffic + Tor's own directory fetches | That you use Tor (bridges mitigate); not the destinations |
 | 6 | Tor with bridges | The bridge addresses you configured | Connect to Tor via pluggable transports | Bridge sees a Tor client; obfs4/webtunnel/snowflake disguise the protocol |
 | 7 | Route Proxy | Your configured SOCKS5 host | Tunnelled traffic | The proxy sees everything you send it (it is a trusted hop by definition) |
+| 7a | I2P module on | i2pd reseed hosts (HTTPS), then I2P routers (NTCP2 TCP / SSU2 UDP) | Join the I2P network and route `*.i2p` traffic | Reseed hosts see your IP once at bootstrap (use a bridge/VPN if that matters); I2P peers see your (random, non-IP) router identity; destination eepsites see the tunnel, not you |
+| 7b | I2P transit enabled (off by default) | Random I2P peers | You relay others' encrypted I2P traffic | Peers see your router identity; bandwidth is consumed |
 | 8 | DoH-via-Tor | DoH provider through Tor exit | Hide your IP from the resolver | Resolver sees a Tor exit; Tor sees you use encrypted DNS (not the contents) |
 
 **DNS upstreams are user-selected.** Umbral ships suggestions; it never

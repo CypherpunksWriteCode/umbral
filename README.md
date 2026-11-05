@@ -33,6 +33,12 @@ release. It is NOT audited. Do not bet your life on it.
   renewal (`NEWNYM`), bootstrap progress, bridge management.
 - **Custom SOCKS5 upstream** for the whole tunnel, with username/password
   support, hostnames always sent to the proxy (remote DNS).
+- **I2P (i2pd)** — the real Purple I2P router (upstream release 3.0.0
+  binaries, BSD-3) runs as a child process; route `*.i2p` traffic through
+  the invisible internet. SOCKS/HTTP proxy on loopback, SAM opt-in, transit
+  participation off by default. Config generation is validated against the
+  real daemon; an opt-in live test fetches a real eepsite end-to-end through
+  our own SOCKS5 client (see tests).
 - **Strict failure mode (default on)** — if Tor or the configured proxy is
   unavailable, connections are **refused**, never silently sent directly.
 - **Diagnostics you can trust** — connection log (what was blocked/passed),
@@ -54,8 +60,10 @@ release. It is NOT audited. Do not bet your life on it.
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-limitation-per-app-upstream).
 - No DNSSEC validation is performed locally; providers that validate are
   marked in the UI (validation happens upstream).
-- No I2P module. The i2p.android.base codebase was assessed and is not
-  integrable in this release (see docs/RESEARCH.md §7). Do not expect I2P.
+- I2P clearnet access requires an explicitly configured outproxy; by default
+  the I2P route serves `*.i2p` destinations only (that is what I2P is for).
+- No I2P module ~~(assessed as not integrable)~~ — **reversed in v0.2.0**:
+  bundled i2pd (Purple I2P) integration shipped; see above.
 - Not tested on a physical device yet in this iteration — see
   docs/IMPLEMENTATION_STATUS.md.
 
@@ -106,10 +114,23 @@ nix-shell shell.nix --run 'true'          # builds the patched SDK toolchain
 
 ## Installing
 
-Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
-(`adb install -r app-debug.apk`). On first start you must grant the VPN
-permission. Distribution target is F-Droid/GitHub releases, **not** Google
-Play (the firewall needs `QUERY_ALL_PACKAGES`, which Play rejects).
+Builds produce **per-ABI APKs** (`app/build/outputs/apk/debug/`) — pick
+`app-arm64-v8a-debug.apk` for a modern phone (80 MB; the universal APK is
+~2.4× larger). Install via `adb install -r <apk>` or by copying the file.
+
+If the installer says **"package invalid / damaged"**: the APK signature has
+been verified on the build side (v2 scheme, `apksigner verify` passes), so in
+practice this means the file was corrupted in transfer (messenger/cloud
+uploads are notorious) or you are installing the *unsigned* release build.
+Compare SHA-256 before installing:
+
+```bash
+sha256sum app-arm64-v8a-debug.apk   # then verify on the phone (e.g. Termux)
+```
+
+On first start you must grant the VPN permission. Distribution target is
+F-Droid/GitHub releases, **not** Google Play (the firewall needs
+`QUERY_ALL_PACKAGES`, which Play rejects).
 
 ## Permissions and why
 
@@ -133,6 +154,7 @@ egress manifest — every outbound connection the app can make.
 | Tor (`libtor.so`) via tor-android 0.4.9.14 | BSD-3-Clause | https://github.com/guardianproject/tor-android |
 | jtorctl 0.4.5.7 | BSD-style | https://github.com/guardianproject/jtorctl |
 | IPtProxy 5.7.0 (obfs4/snowflake/webtunnel/meek_lite/dnstt) | MIT | https://github.com/tladesignz/IPtProxy |
+| i2pd 3.0.0 (Purple I2P) Android binaries | BSD-3-Clause | https://github.com/PurpleI2P/i2pd / i2pd-android |
 | hev-socks5-tunnel 2.19.3 | MIT | https://github.com/heiher/hev-socks5-tunnel |
 | OkHttp 4.12.0 | Apache-2.0 | https://github.com/square/okhttp |
 | AndroidX / Jetpack Compose | Apache-2.0 | https://source.android.com |

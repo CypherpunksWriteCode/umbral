@@ -88,6 +88,7 @@ class PrivacyVpnService : VpnService() {
     private var relay: SocksRelayServer? = null
     private var dnsEngine: DnsEngine? = null
     private var torController: TorController? = null
+    private var i2pdController: I2pdController? = null
     private var currentConfig: UmbralConfig = UmbralConfig()
     private var policy: RoutingPolicy? = null
 
@@ -159,7 +160,22 @@ class PrivacyVpnService : VpnService() {
                 tc.start(currentConfig.tor)
                 serviceScope.launch {
                     tc.state.collect { s ->
-                        U.mgr(ctx).diagnostics.onTorState(s.daemon.name, s.bootstrapProgress, s.socksPort)
+                        U.mgr(applicationContext).diagnostics.onTorState(s.daemon.name, s.bootstrapProgress, s.socksPort)
+                    }
+                }
+            }
+        } else null
+
+        val i2pd = if (currentConfig.i2p.enabled) {
+            I2pdController(applicationContext, ioScope).also { ic ->
+                i2pdController = ic
+                U.mgr(applicationContext).i2pd = ic
+                ic.start(currentConfig.i2p)
+                serviceScope.launch {
+                    ic.state.collect { s ->
+                        U.mgr(applicationContext).diagnostics.onI2pState(
+                            s.router.name, s.socksReady, ic.socksPort()
+                        )
                     }
                 }
             }
@@ -168,7 +184,8 @@ class PrivacyVpnService : VpnService() {
         val pol = RoutingPolicy(
             config = currentConfig,
             torAvailable = { tor?.isSocksReachable() == true },
-            proxyAvailable = { true }
+            proxyAvailable = { true },
+            i2pAvailable = { i2pd?.isSocksReady() == true }
         )
         policy = pol
         val filter = PacketFilter(pol) { currentConfig }
@@ -250,6 +267,9 @@ class PrivacyVpnService : VpnService() {
         U.mgr(applicationContext).tor = null
         torController?.stop()
         torController = null
+        U.mgr(applicationContext).i2pd = null
+        i2pdController?.stop()
+        i2pdController = null
         dnsEngine = null
         runCatching { hevOut?.close() }
         hevOut = null
@@ -441,6 +461,14 @@ class PrivacyVpnService : VpnService() {
         RouteAction.TOR -> Socks5Client.connect(
             InetSocketAddress(InetAddress.getLoopbackAddress(), torSocksPort()), host, port
         )
+        RouteAction.I2P -> {
+            val p = i2pdSocksPort()
+            // .i2p hostnames are resolved by the router itself (remote via
+            // SOCKS ATYP=domain). Clearnet hosts require an outproxy.
+            Socks5Client.connect(
+                InetSocketAddress(InetAddress.getLoopbackAddress(), p), host, port
+            )
+        }
         RouteAction.PROXY -> {
             val pc = currentConfig.proxy
             Socks5Client.connect(
@@ -453,6 +481,9 @@ class PrivacyVpnService : VpnService() {
 
     private fun torSocksPort(): Int =
         torController?.socksPort()?.takeIf { it > 0 } ?: DnsEngine.TOR_SOCKS_PORT
+
+    private fun i2pdSocksPort(): Int =
+        i2pdController?.socksPort()?.takeIf { it > 0 } ?: currentConfig.i2p.socksPort
 
     private fun resolveForDial(host: String): List<InetAddress> {
         if (isLiteralIp(host)) return listOf(InetAddress.getByName(host))

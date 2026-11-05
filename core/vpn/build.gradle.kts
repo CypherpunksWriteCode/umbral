@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":core:config"))
     implementation(project(":core:dns"))
     implementation(project(":core:net"))
+    implementation(project(":core:i2p"))
     implementation(project(":core:tor"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)

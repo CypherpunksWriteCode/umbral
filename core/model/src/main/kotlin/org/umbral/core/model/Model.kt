@@ -3,7 +3,7 @@ package org.umbral.core.model
 import kotlinx.serialization.Serializable
 
 /** What happens to a connection whose app is routed through the VPN tunnel. */
-enum class RouteAction { DIRECT, TOR, PROXY, BLOCK }
+enum class RouteAction { DIRECT, TOR, I2P, PROXY, BLOCK }
 
 /** Network the device is currently attached to. */
 enum class NetKind { WIFI, MOBILE, OTHER }
@@ -107,11 +107,41 @@ data class VpnConfig(
 )
 
 @Serializable
+data class I2pConfig(
+    /** Bundle and run the i2pd router (Purple I2P, BSD-3) and route through it. */
+    val enabled: Boolean = false,
+    /** Local SOCKS5 proxy of i2pd (serves *.i2p destinations). */
+    val socksPort: Int = 4447,
+    /** Local HTTP proxy of i2pd. */
+    val httpProxyPort: Int = 4448,
+    /** Local web console port (loopback only). */
+    val webconsolePort: Int = 7070,
+    /** SAM bridges (for apps speaking SAM). Off by default. */
+    val samEnabled: Boolean = false,
+    /** Accept tunnels (be a transit node). Off by default: least participation, least traffic. */
+    val transitEnabled: Boolean = false,
+    /** Share percentage when transit is enabled. */
+    val sharePercent: Int = 25,
+    /** Outproxy for clearnet hosts reached via I2P SOCKS (rarely available). */
+    val outproxyUrl: String = "",
+    /** Allow-listed extra i2pd.conf lines. */
+    val extraOptions: List<String> = emptyList()
+) {
+    init {
+        require(socksPort in 1..65535) { "socksPort" }
+        require(httpProxyPort in 1..65535) { "httpProxyPort" }
+        require(webconsolePort in 1..65535) { "webconsolePort" }
+        require(sharePercent in 0..100) { "sharePercent" }
+    }
+}
+
+@Serializable
 data class UmbralConfig(
     val defaultRoute: RouteAction = RouteAction.DIRECT,
     val appRules: Map<String, AppRule> = emptyMap(),
     val dns: DnsConfig = DnsConfig(),
     val tor: TorConfig = TorConfig(),
+    val i2p: I2pConfig = I2pConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
     val vpn: VpnConfig = VpnConfig(),
     val autoStartOnBoot: Boolean = false,
@@ -119,24 +149,32 @@ data class UmbralConfig(
 )
 
 /** Preset profiles offered in the UI. Each is a full config transformation. */
-enum class PresetId { PRIVACY_FIRST, TOR_ROUTING, DNS_FIREWALL, CUSTOM }
+enum class PresetId { PRIVACY_FIRST, TOR_ROUTING, I2P_ROUTING, DNS_FIREWALL, CUSTOM }
 
 object Presets {
     fun apply(preset: PresetId, base: UmbralConfig): UmbralConfig = when (preset) {
         PresetId.PRIVACY_FIRST -> base.copy(
             defaultRoute = RouteAction.DIRECT,
             dns = base.dns.copy(mode = DnsMode.DOH, viaTor = false),
-            tor = base.tor.copy(enabled = false)
+            tor = base.tor.copy(enabled = false),
+            i2p = base.i2p.copy(enabled = false)
         )
         PresetId.TOR_ROUTING -> base.copy(
             defaultRoute = RouteAction.TOR,
             dns = base.dns.copy(mode = DnsMode.DOH, viaTor = true),
-            tor = base.tor.copy(enabled = true)
+            tor = base.tor.copy(enabled = true),
+            i2p = base.i2p.copy(enabled = false)
+        )
+        PresetId.I2P_ROUTING -> base.copy(
+            defaultRoute = RouteAction.I2P,
+            tor = base.tor.copy(enabled = false),
+            i2p = base.i2p.copy(enabled = true)
         )
         PresetId.DNS_FIREWALL -> base.copy(
             defaultRoute = RouteAction.DIRECT,
             dns = base.dns.copy(mode = DnsMode.DOH),
-            tor = base.tor.copy(enabled = false)
+            tor = base.tor.copy(enabled = false),
+            i2p = base.i2p.copy(enabled = false)
         )
         PresetId.CUSTOM -> base
     }

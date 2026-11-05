@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Troubleshoot
@@ -39,6 +40,7 @@ import org.umbral.app.ui.AppsScreen
 import org.umbral.app.ui.DashboardScreen
 import org.umbral.app.ui.DiagnosticsScreen
 import org.umbral.app.ui.DnsScreen
+import org.umbral.app.ui.I2pScreen
 import org.umbral.app.ui.RoutingScreen
 import org.umbral.app.ui.SettingsScreen
 import org.umbral.app.ui.TorScreen
@@ -97,6 +99,7 @@ private fun Root(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit) {
         Tab("apps", "Apps", Icons.Filled.Apps),
         Tab("dns", "DNS", Icons.Filled.Dns),
         Tab("tor", "Tor", Icons.Filled.Security),
+        Tab("i2p", "I2P", Icons.Filled.Public),
         Tab("diagnostics", "Diag", Icons.Filled.Troubleshoot),
         Tab("settings", "Setup", Icons.Filled.Settings)
     )
@@ -142,6 +145,7 @@ private fun Root(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit) {
             composable("apps") { AppsScreen(vm) }
             composable("dns") { DnsScreen(vm) }
             composable("tor") { TorScreen(vm) }
+            composable("i2p") { I2pScreen(vm) }
             composable("routing") { RoutingScreen(vm) }
             composable("diagnostics") { DiagnosticsScreen(vm) }
             composable("settings") { SettingsScreen(vm) }

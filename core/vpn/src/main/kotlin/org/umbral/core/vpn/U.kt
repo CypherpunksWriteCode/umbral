@@ -33,6 +33,9 @@ class U private constructor(context: Context) {
     /** Live TorController while the tunnel runs; set by PrivacyVpnService. */
     @Volatile var tor: org.umbral.core.tor.TorController? = null
 
+    /** Live I2pdController while the tunnel runs; set by PrivacyVpnService. */
+    @Volatile var i2pd: I2pdController? = null
+
     init {
         val appCtx = context.applicationContext
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -63,6 +66,13 @@ class U private constructor(context: Context) {
         @Volatile var torBootstrap: Int = 0
             private set
         @Volatile var torSocksPort: Int = -1
+            private set
+
+        @Volatile var i2pRouter: String = "OFF"
+            private set
+        @Volatile var i2pSocksReady: Boolean = false
+            private set
+        @Volatile var i2pSocksPort: Int = -1
             private set
 
         fun onConnection(e: ConnectionEvent) {
@@ -99,6 +109,14 @@ class U private constructor(context: Context) {
             torBootstrap = bootstrap
             torSocksPort = socksPort
             torLog.addFirst("$daemon boot=$bootstrap socks=$socksPort")
+            while (torLog.size > 200) torLog.removeLast()
+        }
+
+        fun onI2pState(router: String, socksReady: Boolean, socksPort: Int) {
+            i2pRouter = router
+            i2pSocksReady = socksReady
+            i2pSocksPort = socksPort
+            torLog.addFirst("i2pd: $router socksReady=$socksReady port=$socksPort")
             while (torLog.size > 200) torLog.removeLast()
         }
 

@@ -23,6 +23,10 @@ compilation and review, not runtime) · **PARTIALLY IMPLEMENTED** ·
 | /proc/net parser | IMPLEMENTED AND TESTED | 2 tests (fallback path for API<29 class devices; minSdk 29 makes this auxiliary) |
 | VPN service (TUN pumps, socketpair↔hev, DNS responder, notification, boot) | IMPLEMENTED, NOT FULLY TESTED | **not run on a device/emulator in this environment** |
 | Tor controller (TorService lifecycle, status, bootstrap, NEWNYM, torrc, bridges via IPtProxy) | IMPLEMENTED, NOT FULLY TESTED | API surface verified against tor-android sources; runtime not exercised here |
+| I2P: i2pd.conf generator (allow-listed options, loopback-only services) | IMPLEMENTED AND TESTED | 4 unit tests + **real-daemon boot test** (nixpkgs i2pd runs the generated config; SOCKS + webconsole verified; catches invalid options) |
+| I2P: live end-to-end (our SOCKS5 client → i2pd → I2P network → eepsite HTTP 200) | TESTED (opt-in) | `UMBRAL_I2PD_LIVE=1`, network+minutes required; executed successfully in this iteration (zzz.i2p) |
+| I2P: I2pdController (exec libi2pd.so, log tail, SOCKS readiness probing, lifecycle) | IMPLEMENTED, NOT FULLY TESTED | same exec technique as upstream i2pd-android; runtime not exercised on a device here |
+| I2P: routing action + preset + UI screen | IMPLEMENTED, NOT FULLY TESTED | policy logic covered by 3 new unit tests |
 | hev-socks5-tunnel integration (JNI contract, SEQPACKET interposer) | IMPLEMENTED, NOT FULLY TESTED | verified against hev source; runtime untested |
 | Dashboard / Apps / DNS / Tor / Routing / Diagnostics / Settings UI | IMPLEMENTED, NOT FULLY TESTED | compiles; no UI test run |
 | Instrumented smoke test (app) | NOT EXECUTED | source present (`app/src/androidTest`); no emulator in environment |
@@ -31,7 +35,7 @@ compilation and review, not runtime) · **PARTIALLY IMPLEMENTED** ·
 
 | Feature | Status | Why |
 |---|---|---|
-| I2P | NOT IMPLEMENTED | upstream Android repo archived; no maintained artifact (docs/RESEARCH.md §7) |
+| I2P | NOT IMPLEMENTED → **IMPLEMENTED in v0.2.0** (see module rows above; decision reversed after verifying PurpleI2P releases) |
 | Per-app *upstream* selection inside tunnel | BLOCKED BY PLATFORM LIMITATION | hev does not preserve source ports (source-verified); see architecture doc |
 | DNSCrypt client | NOT IMPLEMENTED | protocol work beyond v0.1 scope |
 | DNSSEC local validation | NOT IMPLEMENTED | would require embedding a validator (unbound-class) responsibly |

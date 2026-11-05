@@ -79,6 +79,28 @@ class RoutingPolicyTest {
     }
 
     @Test
+    fun `i2p unavailable with strict blocks instead of direct`() {
+        val p = RoutingPolicy(config(default = RouteAction.I2P), { true }, { true }, { false })
+        val d = p.resolve(1000, NetKind.WIFI, true)
+        assertEquals(RouteAction.BLOCK, d.action)
+        assertTrue(d.reason.contains("I2P unavailable"))
+    }
+
+    @Test
+    fun `i2p available routes to i2p`() {
+        val p = RoutingPolicy(config(default = RouteAction.I2P), { true }, { true }, { true })
+        assertEquals(RouteAction.I2P, p.resolve(1000, NetKind.WIFI, true).action)
+    }
+
+    @Test
+    fun `i2p preset enables router and route`() {
+        val tor = Presets.apply(PresetId.I2P_ROUTING, UmbralConfig())
+        assertEquals(RouteAction.I2P, tor.defaultRoute)
+        assertTrue(tor.i2p.enabled)
+        assertTrue(!tor.tor.enabled)
+    }
+
+    @Test
     fun `untunneled traffic is reported as direct`() {
         val p = RoutingPolicy(config(default = RouteAction.TOR), { true }, { true })
         val d = p.resolve(1000, NetKind.WIFI, false)
