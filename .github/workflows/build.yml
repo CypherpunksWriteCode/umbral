@@ -20,7 +20,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-37 build-tools;36.1.0 platform-tools'
+          # API 37 ships with a minor-version package id (verified against
+          # dl.google.com/repository/repository2-*.xml): platforms;android-37.0
+          packages: 'platforms;android-37.0 build-tools;36.1.0 platform-tools'
 
       - name: Fetch native deps
         run: ./scripts/fetch-native-deps.sh
