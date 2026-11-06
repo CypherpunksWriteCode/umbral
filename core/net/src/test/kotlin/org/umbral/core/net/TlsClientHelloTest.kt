@@ -96,6 +96,29 @@ class BridgeBatchTest {
     }
 
     @Test
+    fun `vanilla bridges accepted bare and with explicit prefix`() {
+        val text = """
+            51.15.43.205:9001 4352E58420E68F5E40BF7C74F8CCD2CA4AE7E79A
+            vanilla 193.11.166.194:9001 34F8E6D4C714C75E89AE80B1E709F6F4EC0C0A55
+            [2001:db8::1]:9001 4352E58420E68F5E40BF7C74F8CCD2CA4AE7E79A
+        """.trimIndent()
+        val res = org.umbral.core.model.BridgeBatch.parse(text)
+        assertEquals(3, res.bridges.size)
+        assertTrue(res.errors.isEmpty())
+        // explicit 'vanilla' prefix is stripped, line stays paste-ready for torrc
+        assertEquals("193.11.166.194:9001 34F8E6D4C714C75E89AE80B1E709F6F4EC0C0A55", res.bridges[1].line)
+        // ipv6 bracket form preserved verbatim
+        assertTrue(res.bridges[2].line.startsWith("[2001:db8::1]:9001 "))
+    }
+
+    @Test
+    fun `vanilla without fingerprint rejected`() {
+        val res = org.umbral.core.model.BridgeBatch.parse("51.15.43.205:9001")
+        assertTrue(res.bridges.isEmpty())
+        assertTrue(res.errors.first().contains("vanilla bridge needs"))
+    }
+
+    @Test
     fun `rejects missing fingerprint`() {
         val res = org.umbral.core.model.BridgeBatch.parse("obfs4 1.2.3.4:443")
         assertTrue(res.bridges.isEmpty())

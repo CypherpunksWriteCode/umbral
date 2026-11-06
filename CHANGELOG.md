@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.5.1] — 2026-11-07
+
+### Fixed
+- Tor status/log froze while bootstrapping: the control-event listener was
+  attached only after STATUS_ON, so a daemon stuck on guard connections
+  (censored networks) showed 0% and an empty log. Now attached as soon as the
+  control connection exists.
+
+### Added
+- Vanilla bridge support: paste BridgesDB vanilla lines as
+  `<ip:port> <fingerprint>` (IPv6 `[..]:port` works); an explicit `vanilla`
+  prefix is stripped. Tor dials these directly, no pluggable transport.
+- Tor screen: live log tail and a stuck-bootstrap hint pointing at bridges.
+
 ## [0.5.0] — 2026-11-07
 
 ### Fixed — three real crashes, all reproduced on an API 35 emulator

@@ -193,19 +193,47 @@ object BridgeBatch {
 
     data class Result(val bridges: List<BridgeLine>, val errors: List<String>)
 
+    /** host:port forms: 1.2.3.4:9001, [2001:db8::1]:9001, example.com:9001 */
+    private fun looksLikeAddressPort(s: String): Boolean {
+        if (']' in s) return Regex("^\\[[0-9a-fA-F:.]+]:\\d+$").matches(s)
+        if (s.count { it == ':' } != 1) return false
+        val (host, port) = s.substringBeforeLast(':') to s.substringAfterLast(':')
+        return port.toIntOrNull() in 1..65535 && host.isNotEmpty()
+    }
+
     fun parse(text: String): Result {
         val bridges = ArrayList<BridgeLine>()
         val errors = ArrayList<String>()
         text.lineSequence().forEachIndexed { idx, raw ->
             val line = raw.trim()
             if (line.isEmpty() || line.startsWith("#")) return@forEachIndexed
-            val transport = line.split(Regex("\\s+")).firstOrNull()?.lowercase() ?: ""
-            if (transport !in KNOWN) {
-                errors.add("line ${idx + 1}: unknown transport '$transport' (need ${KNOWN.joinToString("/")})")
+            val tokens = line.split(Regex("\\s+"))
+            // Vanilla bridges: no pluggable transport — tor dials them directly.
+            // Accepted shapes (what BridgesDB / bridges.torproject.org give):
+            //   1.2.3.4:9001 4352E58420E68F5E40BF7C74F8CCD2CA4AE7E79A
+            //   vanilla 1.2.3.4:9001 4352E... (explicit prefix, stripped)
+            if (looksLikeAddressPort(tokens[0])) {
+                if (tokens.size < 2) {
+                    errors.add("line ${idx + 1}: vanilla bridge needs '<ip:port> <fingerprint>'")
+                    return@forEachIndexed
+                }
+                bridges.add(BridgeLine(tokens.joinToString(" ")))
                 return@forEachIndexed
             }
-            val rest = line.split(Regex("\\s+"), limit = 2).getOrNull(1)?.trim() ?: ""
-            if (rest.isEmpty() || rest.split(Regex("\\s+")).size < 2) {
+            if (tokens[0].equals("vanilla", ignoreCase = true)) {
+                if (tokens.size < 3 || !looksLikeAddressPort(tokens[1])) {
+                    errors.add("line ${idx + 1}: 'vanilla <ip:port> <fingerprint>' expected")
+                    return@forEachIndexed
+                }
+                bridges.add(BridgeLine(tokens.drop(1).joinToString(" ")))
+                return@forEachIndexed
+            }
+            val transport = tokens[0].lowercase()
+            if (transport !in KNOWN) {
+                errors.add("line ${idx + 1}: unknown transport '$transport' (need ${KNOWN.joinToString("/")} or a plain 'ip:port fingerprint' vanilla bridge)")
+                return@forEachIndexed
+            }
+            if (tokens.size < 3) {
                 errors.add("line ${idx + 1}: expected '<transport> <address[:port]> <fingerprint> [args]'")
                 return@forEachIndexed
             }

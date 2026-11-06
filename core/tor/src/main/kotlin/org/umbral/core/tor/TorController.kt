@@ -184,12 +184,15 @@ class TorController(
     }
 
     private suspend fun watchSocksPort() {
+        var listenerAttached = false
         while (scope.isActive && bound) {
             pollSocksPortOnce()
-            if (_state.value.socksReady) {
-                attachBootstrapListener()
-                break
-            }
+            // Attach as soon as the control connection exists — even while
+            // Tor is still bootstrapping. Otherwise a daemon stuck on guard
+            // connections (censored network) reports NOTHING: no progress,
+            // no logs, and the UI shows a frozen "Starting…".
+            if (!listenerAttached) listenerAttached = attachBootstrapListener()
+            if (_state.value.socksReady && listenerAttached) break
             delay(500)
         }
     }
@@ -207,13 +210,16 @@ class TorController(
         }
     }
 
-    private fun attachBootstrapListener() {
-        val conn = torControlConnection() ?: return
-        runCatching {
+    /** @return true when the control connection accepted our event listener. */
+    private fun attachBootstrapListener(): Boolean {
+        val conn = torControlConnection() ?: return false
+        val ok = runCatching {
             conn.addRawEventListener(bootstrapListener)
             // Keep STATUS_CLIENT (TorService depends on it) and add NOTICE for logs.
             conn.setEvents(listOf(TorControlCommands.EVENT_STATUS_CLIENT, TorControlCommands.EVENT_NOTICE_MSG))
-        }
+        }.isSuccess
+        if (ok) appendLog("control events attached")
+        return ok
     }
 
     /**

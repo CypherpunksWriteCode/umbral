@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +21,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,13 +41,18 @@ fun TorScreen(vm: MainViewModel) {
     val cfg by vm.config.collectAsState()
     val vpnActive by vm.vpnActive.collectAsState()
 
+    // Tor log tail refreshes once a second (fields are volatile in the kernel).
+    var tick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); tick++ } }
+    val torLog = remember(tick) { vm.diag.recentTorLog().take(24) }
+    val (daemon, boot, socks) = remember(tick) { vm.torState() }
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("Tor", style = MaterialTheme.typography.headlineSmall)
 
-        val (daemon, boot, socks) = vm.torState()
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -56,6 +68,15 @@ fun TorScreen(vm: MainViewModel) {
                     Text(
                         "Traffic currently routed through Tor: ${cfg.appRules.values.count { it.wifi == org.umbral.core.model.RouteAction.TOR }} apps + tunnel default"
                     )
+                    if (boot < 100) {
+                        Text(
+                            "If bootstrap stalls, your network is blocking direct Tor connections. " +
+                                "Enable bridges below — Snowflake works in most censored networks; " +
+                                "obfs4/webtunnel lines from bridges.torproject.org can be pasted as a list.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 } else if (cfg.tor.enabled) {
                     Text("Start protection to boot the Tor daemon.")
                 }
@@ -68,11 +89,30 @@ fun TorScreen(vm: MainViewModel) {
             cfg.tor.enabled
         ) { on -> vm.update { it.copy(tor = it.tor.copy(enabled = on)) } }
 
+        if (cfg.tor.enabled && vpnActive) {
+            Text("Tor log (live)", style = MaterialTheme.typography.titleMedium)
+            Card(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.padding(8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    if (torLog.isEmpty()) {
+                        Text("no log lines yet…", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        torLog.reversed().forEach { line ->
+                            Text(line, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+
         Text("Bridges", style = MaterialTheme.typography.titleMedium)
         Text(
             "Bridges hide the fact you use Tor from the local network. Pick a built-in set " +
-                "or paste your own list (BridgesDB, friends). One per line: " +
-                "<transport> <address:port> <fingerprint> [args].",
+                "or paste your own list (BridgesDB, friends). Formats: " +
+                "<transport> <address:port> <fingerprint> [args] (obfs4, snowflake, webtunnel, meek_lite…) " +
+                "or a vanilla bridge — just <ip:port> <fingerprint>.",
             style = MaterialTheme.typography.bodySmall
         )
         SwitchRow(
