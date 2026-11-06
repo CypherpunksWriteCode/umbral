@@ -109,6 +109,11 @@ class PrivacyVpnService : VpnService() {
             private set
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        createChannel()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
@@ -600,11 +605,31 @@ class PrivacyVpnService : VpnService() {
     // ------------------------------------------------------------------ foreground plumbing
 
     private fun startForegroundWithType() {
+        // The channel must exist before startForeground, otherwise the SYSTEM
+        // kills the service ("invalid channel for service notification").
+        // Re-created here defensively in addition to onCreate().
+        createChannel()
         val notif = buildNotification()
-        if (Build.VERSION.SDK_INT >= 34) {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(NOTIFICATION_ID, notif)
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, notif)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Umbral", "startForeground failed", e)
+        }
+    }
+
+    private fun createChannel() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "VPN status", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "Shows whether the Umbral tunnel is active"
+                    setShowBadge(false)
+                }
+            )
         }
     }
 

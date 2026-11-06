@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.4.1] — 2026-11-06
+
+### Fixed
+- THE start crash, reproduced and verified fixed on a live Android 15
+  emulator: the VPN service's notification channel was never created
+  (createChannel was lost in an earlier refactor), so Android killed the
+  service ("invalid channel for service notification") and the whole
+  process on Start. Channel is now created in onCreate AND defensively
+  before startForeground.
+
+### Tested on emulator (API 35, x86_64)
+- install, VPN consent, start: tunnel CONNECTED and system-VALIDATED
+  (DNS+HTTP through the tunnel), browser loads pages
+- stop/start cycles, i2pd child process with SOCKS/webconsole listening,
+  Tor daemon loading. Unit suite: 68/68.
+
 ## [0.4.0] — 2026-11-06
 
 ### Added
