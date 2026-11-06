@@ -70,7 +70,10 @@ class I2pdController(
                 runCatching {
                     p.inputStream.bufferedReader().forEachLine { appendLog(it.take(300)) }
                 }
-                appendLog("i2pd exited with code ${p.exitValue()}")
+                // The stream can hit EOF while the process is still reaping —
+                // exitValue() would throw IllegalThreadStateException.
+                runCatching { p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) }
+                appendLog("i2pd exited")
                 _state.value = _state.value.copy(router = ModuleState.ERROR, socksReady = false)
             }.apply { isDaemon = true; name = "umbral-i2pd-log"; start() }
 
@@ -107,6 +110,10 @@ class I2pdController(
     }
 
     fun isSocksReady(): Boolean = _state.value.socksReady
+
+    /** Router alive (starting or active) — reuse on tunnel restart. */
+    fun isAlive(): Boolean =
+        _state.value.router == ModuleState.ACTIVE || _state.value.router == ModuleState.STARTING
 
     fun socksPort(): Int = cfg.socksPort
 

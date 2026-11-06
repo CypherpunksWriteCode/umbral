@@ -98,9 +98,9 @@ private fun Root(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit) {
     val tabs = listOf(
         Tab("dashboard", "Home", Icons.Filled.Home),
         Tab("apps", "Apps", Icons.Filled.Apps),
-        Tab("net", "Net", Icons.Filled.Dns),
-        Tab("diagnostics", "Diag", Icons.Filled.Troubleshoot),
-        Tab("settings", "Setup", Icons.Filled.Settings)
+        Tab("net", "Advanced", Icons.Filled.Dns),
+        Tab("diagnostics", "Logs", Icons.Filled.Troubleshoot),
+        Tab("settings", "Settings", Icons.Filled.Settings)
     )
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: "dashboard"

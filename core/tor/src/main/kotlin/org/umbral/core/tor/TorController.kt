@@ -162,6 +162,10 @@ class TorController(
         return s.daemon == ModuleState.ACTIVE && s.socksReady
     }
 
+    /** Daemon alive (starting or active) — reuse on tunnel restart instead of killing it. */
+    fun isAlive(): Boolean =
+        _state.value.daemon == ModuleState.ACTIVE || _state.value.daemon == ModuleState.STARTING
+
     fun socksPort(): Int = _state.value.socksPort
 
     // --- internals ---

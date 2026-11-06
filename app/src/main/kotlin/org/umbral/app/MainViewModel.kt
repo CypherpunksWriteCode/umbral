@@ -96,6 +96,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Quick toggles for the Home screen: apply immediately. If the tunnel is
+     * running it is restarted in place — no "restart required" nagging.
+     */
+    fun toggleTor(on: Boolean) = quickToggle { cfg ->
+        cfg.copy(
+            tor = cfg.tor.copy(enabled = on),
+            defaultRoute = when {
+                on -> org.umbral.core.model.RouteAction.TOR
+                cfg.defaultRoute == org.umbral.core.model.RouteAction.TOR -> org.umbral.core.model.RouteAction.DIRECT
+                else -> cfg.defaultRoute
+            }
+        )
+    }
+
+    fun toggleI2p(on: Boolean) = quickToggle { cfg ->
+        cfg.copy(
+            i2p = cfg.i2p.copy(enabled = on),
+            defaultRoute = when {
+                on -> org.umbral.core.model.RouteAction.I2P
+                cfg.defaultRoute == org.umbral.core.model.RouteAction.I2P -> org.umbral.core.model.RouteAction.DIRECT
+                else -> cfg.defaultRoute
+            }
+        )
+    }
+
+    fun toggleEncryptedDns(on: Boolean) = quickToggle { cfg ->
+        val mode = if (on) org.umbral.core.model.DnsMode.DOH else org.umbral.core.model.DnsMode.SYSTEM_PASSTHROUGH
+        cfg.copy(dns = cfg.dns.copy(mode = mode))
+    }
+
+    fun toggleAntiDpi(on: Boolean) = quickToggle { cfg ->
+        cfg.copy(antiDpi = cfg.antiDpi.copy(enabled = on))
+    }
+
+    private fun quickToggle(transform: (UmbralConfig) -> UmbralConfig) {
+        viewModelScope.launch {
+            kernel.configRepo.update(transform)
+            needsRestart.value = false
+            if (vpnActive.value) {
+                // In-place reconfigure: daemons (Tor/i2pd) survive, the tunnel
+                // is rebuilt. Stopping the whole service here would SIGABRT
+                // libtor on Android.
+                val app = getApplication<Application>()
+                val i = Intent(app, PrivacyVpnService::class.java)
+                    .setAction(PrivacyVpnService.ACTION_RESTART)
+                app.startForegroundService(i)
+            }
+        }
+    }
+
     fun applyPreset(preset: PresetId) {
         update { Presets.apply(preset, it) }
     }

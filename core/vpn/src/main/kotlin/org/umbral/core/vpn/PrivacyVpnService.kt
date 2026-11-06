@@ -104,6 +104,7 @@ class PrivacyVpnService : VpnService() {
         const val NOTIFICATION_ID = 1
         const val ACTION_STOP = "org.umbral.core.vpn.STOP"
         const val ACTION_START = "org.umbral.core.vpn.START"
+        const val ACTION_RESTART = "org.umbral.core.vpn.RESTART"
 
         @Volatile var isRunning: Boolean = false
             private set
@@ -120,6 +121,33 @@ class PrivacyVpnService : VpnService() {
                 stopTunnel()
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_RESTART -> {
+                // Reconfigure the tunnel without killing Tor/i2pd daemons:
+                // tearing down TorService mid-run causes a native SIGABRT in
+                // libtor (FORTIFY: mutex lock on destroyed mutex).
+                startForegroundWithType()
+                serviceScope.launch {
+                    try {
+                        val fresh = kotlinx.coroutines.runBlocking {
+                            U.mgr(applicationContext).configRepo.current()
+                        }
+                        if (running.get()) {
+                            teardownVpn(keepTor = fresh.tor.enabled, keepI2p = fresh.i2p.enabled)
+                            running.set(false)
+                            isRunning = false
+                            U.mgr(applicationContext).diagnostics.onVpnState(false)
+                        }
+                        startTunnel()
+                    } catch (t: Throwable) {
+                        U.mgr(applicationContext).diagnostics.onVpnError(
+                            "tunnel restart failed: ${t.message ?: t.javaClass.simpleName}"
+                        )
+                        android.util.Log.e("Umbral", "tunnel restart failed", t)
+                        stopTunnel()
+                        stopSelf()
+                    }
+                }
             }
             else -> {
                 startForegroundWithType()
@@ -171,29 +199,41 @@ class PrivacyVpnService : VpnService() {
         }
         dnsEngine = engine
 
+        // Reuse running daemons across tunnel restarts (killing TorService
+        // mid-run SIGABRTs libtor); start them only when not alive yet.
         val tor = if (currentConfig.tor.enabled) {
-            TorController(applicationContext, ioScope).also { tc ->
-                torController = tc
-                U.mgr(applicationContext).tor = tc
-                tc.start(currentConfig.tor)
-                serviceScope.launch {
-                    tc.state.collect { s ->
-                        U.mgr(applicationContext).diagnostics.onTorState(s.daemon.name, s.bootstrapProgress, s.socksPort)
+            val existing = torController
+            if (existing != null && existing.isAlive()) {
+                existing
+            } else {
+                TorController(applicationContext, ioScope).also { tc ->
+                    torController = tc
+                    U.mgr(applicationContext).tor = tc
+                    tc.start(currentConfig.tor)
+                    serviceScope.launch {
+                        tc.state.collect { s ->
+                            U.mgr(applicationContext).diagnostics.onTorState(s.daemon.name, s.bootstrapProgress, s.socksPort)
+                        }
                     }
                 }
             }
         } else null
 
         val i2pd = if (currentConfig.i2p.enabled) {
-            I2pdController(applicationContext, ioScope).also { ic ->
-                i2pdController = ic
-                U.mgr(applicationContext).i2pd = ic
-                ic.start(currentConfig.i2p)
-                serviceScope.launch {
-                    ic.state.collect { s ->
-                        U.mgr(applicationContext).diagnostics.onI2pState(
-                            s.router.name, s.socksReady, ic.socksPort()
-                        )
+            val existing = i2pdController
+            if (existing != null && existing.isAlive()) {
+                existing
+            } else {
+                I2pdController(applicationContext, ioScope).also { ic ->
+                    i2pdController = ic
+                    U.mgr(applicationContext).i2pd = ic
+                    ic.start(currentConfig.i2p)
+                    serviceScope.launch {
+                        ic.state.collect { s ->
+                            U.mgr(applicationContext).diagnostics.onI2pState(
+                                s.router.name, s.socksReady, ic.socksPort()
+                            )
+                        }
                     }
                 }
             }
@@ -284,18 +324,31 @@ class PrivacyVpnService : VpnService() {
         if (!running.compareAndSet(true, false)) return
         isRunning = false
         U.mgr(applicationContext).diagnostics.onVpnState(false)
+        teardownVpn(keepTor = false, keepI2p = false)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+    }
+
+    /**
+     * Tear down the data plane. When [keepTor]/[keepI2p] are true the daemons
+     * keep running so a tunnel restart (config change) does not abort libtor.
+     */
+    private fun teardownVpn(keepTor: Boolean, keepI2p: Boolean) {
         runCatching { TProxyService.TProxyStopService() }
         hevStarted = false
         pumpThreads.forEach { it.interrupt() }
         pumpThreads.clear()
         runCatching { relay?.stop() }
         relay = null
-        U.mgr(applicationContext).tor = null
-        torController?.stop()
-        torController = null
-        U.mgr(applicationContext).i2pd = null
-        i2pdController?.stop()
-        i2pdController = null
+        if (!keepTor) {
+            U.mgr(applicationContext).tor = null
+            torController?.stop()
+            torController = null
+        }
+        if (!keepI2p) {
+            U.mgr(applicationContext).i2pd = null
+            i2pdController?.stop()
+            i2pdController = null
+        }
         dnsEngine = null
         runCatching { hevOut?.close() }
         hevOut = null
@@ -305,7 +358,6 @@ class PrivacyVpnService : VpnService() {
         tunOut = null
         runCatching { tun?.close() }
         tun = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
     }
 
     // ------------------------------------------------------------------ interface

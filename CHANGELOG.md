@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 The format follows Keep a Changelog; versioning is semantic once 1.0 ships.
 
+## [0.5.0] — 2026-11-07
+
+### Fixed — three real crashes, all reproduced on an API 35 emulator
+1. Release-only crash when starting Tor: R8 renamed JNI-referenced members
+   of TorService → NoSuchFieldError in libtor (fixed with keep rules;
+   tor-android's AAR ships none).
+2. Native SIGABRT in libtor (FORTIFY: destroyed mutex) whenever the tunnel
+   restarted while Tor ran: full service teardown killed TorService mid-run.
+   Tunnels now reconfigure in place (ACTION_RESTART) and reuse running
+   Tor/i2pd daemons.
+3. Crash in the i2pd log reader thread (IllegalThreadStateException from
+   exitValue() before process reaping).
+
+### UI — simple by default
+- Home is now: one Start/Stop button + four plain toggles (Tor, I2P,
+  encrypted DNS, anti-DPI). Toggles apply immediately — the tunnel
+  reconfigures in place, daemons are not restarted (Tor bootstrap survives).
+- Live status subtitles (Tor bootstrap %, SOCKS port, i2pd router state).
+- Presets removed from the UI; advanced controls live on the Advanced tab.
+
 ## [0.4.1] — 2026-11-06
 
 ### Fixed

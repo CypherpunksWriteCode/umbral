@@ -27,7 +27,7 @@ fun NetScreen(vm: MainViewModel) {
 
     Column(Modifier.fillMaxSize()) {
         Text(
-            "Network modules",
+            "Advanced settings",
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(start = 16.dp, top = 12.dp)
         )

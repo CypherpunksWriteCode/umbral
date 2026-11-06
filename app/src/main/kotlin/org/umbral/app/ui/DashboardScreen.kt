@@ -1,13 +1,11 @@
 package org.umbral.app.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,33 +14,42 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
 import org.umbral.app.MainViewModel
-import org.umbral.core.model.ModuleState
-import org.umbral.core.model.PresetId
-import org.umbral.core.model.RouteAction
+import org.umbral.core.model.DnsProviders
 
+/** Home: one big switch for protection, one toggle per module. Nothing else. */
 @Composable
 fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRouting: () -> Unit = {}) {
     val cfg by vm.config.collectAsState()
     val vpnActive by vm.vpnActive.collectAsState()
     val vpnError by vm.vpnError.collectAsState()
-    val needsRestart by vm.needsRestart.collectAsState()
+
+    // Module statuses live in volatile fields; poll them once a second.
+    var tick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); tick++ } }
+    val tor = remember(tick) { vm.torState() }
+    val i2p = remember(tick) { vm.i2pState() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("Umbral", style = MaterialTheme.typography.headlineMedium)
 
@@ -61,146 +68,109 @@ fun DashboardScreen(vm: MainViewModel, onToggleVpn: (Boolean) -> Unit, onOpenRou
                 )
                 Text(
                     when {
-                        vpnActive && cfg.tor.enabled -> "All tunneled traffic goes through Tor. DNS is encrypted."
-                        vpnActive -> "Firewall + encrypted DNS active. Traffic leaves directly (not anonymous)."
-                        else -> "Right now nothing is filtered. Tap Start — you'll confirm one VPN permission."
+                        vpnActive && cfg.tor.enabled && tor.third > 0 ->
+                            "Traffic goes through Tor. Bootstrap ${tor.second}%."
+                        vpnActive && cfg.tor.enabled -> "Starting Tor… traffic waits for the daemon."
+                        vpnActive && cfg.i2p.enabled -> "Traffic goes through I2P."
+                        vpnActive -> "Firewall + encrypted DNS. Traffic leaves directly (not anonymous)."
+                        else -> "Nothing is filtered right now."
                     },
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (!vpnActive) vpnError?.let { Text("Error: $it", color = MaterialTheme.colorScheme.error) }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { onToggleVpn(!vpnActive) }) {
-                        Text(if (vpnActive) "Stop" else "Start protection")
-                    }
+                Button(onClick = { onToggleVpn(!vpnActive) }) {
+                    Text(if (vpnActive) "Stop" else "Start protection")
                 }
-                if (needsRestart && vpnActive) {
-                    Text(
-                        "Settings changed. Restart the tunnel to apply.",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+            }
+        }
+
+        Text("Modules", style = MaterialTheme.typography.titleMedium)
+
+        ModuleToggle(
+            title = "Tor",
+            subtitle = when {
+                !cfg.tor.enabled -> "Off — direct connection"
+                vpnActive && tor.third > 0 -> "Running, SOCKS :${tor.third}" + if (tor.second < 100) ", bootstrap ${tor.second}%" else ""
+                vpnActive && tor.first == "ERROR" -> "Error — check Logs"
+                vpnActive -> "Starting…"
+                else -> "Enabled — starts with protection"
+            },
+            checked = cfg.tor.enabled,
+            onToggle = vm::toggleTor,
+            extra = {
+                if (cfg.tor.enabled && vpnActive && tor.second in 1..99) {
+                    LinearProgressIndicator(
+                        progress = { tor.second / 100f },
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
                     )
                 }
+                if (cfg.tor.enabled && vpnActive && tor.third > 0) {
+                    TextButton(onClick = { vm.newTorIdentity() }) { Text("New circuit") }
+                }
             }
-        }
-
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("How do I use this?", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "1. Apps tab: choose which apps go through the tunnel (Tunnel), bypass it " +
-                        "(Bypass), or lose network (Block).\n" +
-                        "2. Net tab: pick where tunneled traffic goes — Direct, Tor, I2P or your " +
-                        "proxy — and how DNS is resolved.\n" +
-                        "3. Diag tab: see what actually happens.\n" +
-                        "Presets below set the common combinations in one tap.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        val states = vm.moduleStates(cfg)
-        ModuleRow("VPN tunnel & firewall", states["vpn"] ?: ModuleState.OFF)
-        ModuleRow("DNS privacy (${cfg.dns.mode})", states["dns"] ?: ModuleState.OFF)
-        ModuleRow(
-            "Tor routing (global route: ${cfg.defaultRoute.name.lowercase()})",
-            states["tor"] ?: ModuleState.OFF
         )
-        if (cfg.i2p.enabled) ModuleRow("I2P router (i2pd)", states["i2p"] ?: ModuleState.OFF)
-        if (cfg.tor.enabled && vpnActive) {
-            val (daemon, boot, socks) = vm.torState()
-            Text("Tor: $daemon  bootstrap: $boot%  SOCKS: ${if (socks > 0) socks else "—"}",
-                style = MaterialTheme.typography.bodySmall)
-            if (boot in 1..99) LinearProgressIndicator(progress = { boot / 100f }, modifier = Modifier.fillMaxWidth())
-        }
 
-        Spacer(Modifier.height(8.dp))
-        Text("Routing", style = MaterialTheme.typography.titleMedium)
-        Card(
-            Modifier
-                .fillMaxWidth()
-                .clickable { onOpenRouting() }
-        ) {
-            Column(Modifier.padding(12.dp)) {
-                Text(
-                    "Global tunnel route: ${cfg.defaultRoute.name.lowercase()}  •  strict no-fallback: ${if (cfg.vpn.strictNoFallback) "on" else "off"}\n" +
-                        "Bypassed apps: ${cfg.vpn.bypassUids.size} • Blocked apps: ${cfg.appRules.count { it.value.wifi == RouteAction.BLOCK || it.value.mobile == RouteAction.BLOCK }}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
+        ModuleToggle(
+            title = "I2P (i2pd)",
+            subtitle = when {
+                !cfg.i2p.enabled -> "Off — *.i2p unreachable"
+                vpnActive && i2p.socksReady -> "Router running, SOCKS :${i2p.socksPort}"
+                vpnActive -> "Router starting (bootstrap takes minutes)…"
+                else -> "Enabled — starts with protection"
+            },
+            checked = cfg.i2p.enabled,
+            onToggle = vm::toggleI2p
+        )
 
-        Spacer(Modifier.height(8.dp))
-        Text("Presets", style = MaterialTheme.typography.titleMedium)
-        PresetChip("Privacy First", "Encrypted DNS + firewall, direct traffic", PresetId.PRIVACY_FIRST, vm, cfg.tor.enabled || cfg.defaultRoute != RouteAction.DIRECT)
-        PresetChip("Tor Routing", "Everything tunneled through Tor", PresetId.TOR_ROUTING, vm, cfg.defaultRoute != RouteAction.TOR)
-        PresetChip("I2P Routing", "Tunnelled traffic through I2P (i2pd)", PresetId.I2P_ROUTING, vm, cfg.defaultRoute != RouteAction.I2P)
-        PresetChip("DNS Firewall", "Encrypted DNS + firewall only", PresetId.DNS_FIREWALL, vm, false)
+        ModuleToggle(
+            title = "Encrypted DNS",
+            subtitle = if (cfg.dns.mode != org.umbral.core.model.DnsMode.SYSTEM_PASSTHROUGH) {
+                val p = DnsProviders.byId(cfg.dns.providerId)
+                "On — ${p?.label ?: "custom"}" + if (cfg.dns.viaTor) ", via Tor" else ""
+            } else "Off — queries go in plaintext",
+            checked = cfg.dns.mode != org.umbral.core.model.DnsMode.SYSTEM_PASSTHROUGH,
+            onToggle = vm::toggleEncryptedDns
+        )
 
-        Spacer(Modifier.height(8.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("What this does NOT protect against", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "• A compromised operating system or rooted device.\n" +
-                        "• Traffic you send over HTTPS is still visible to the destination server.\n" +
-                        "• Tor does not anonymize traffic you route outside it.\n" +
-                        "• Apps excluded (bypassed) from the tunnel use direct connections.\n" +
-                        "• A global adversary can attempt traffic analysis on Tor.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
+        ModuleToggle(
+            title = "Anti-DPI",
+            subtitle = if (cfg.antiDpi.enabled) "On — hides SNI from packet inspectors"
+            else "Off — TLS hostnames visible to the network",
+            checked = cfg.antiDpi.enabled,
+            onToggle = vm::toggleAntiDpi
+        )
+
+        Spacer(Modifier.padding(bottom = 4.dp))
+        Text(
+            "Toggles apply immediately. Apps rules: Apps tab. Everything else: Advanced tab.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun ModuleRow(name: String, state: ModuleState) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    when (state) {
-                        ModuleState.OFF -> "off"
-                        ModuleState.STARTING -> "starting…"
-                        ModuleState.ACTIVE -> "active"
-                        ModuleState.ERROR -> "error"
-                        ModuleState.STOPPING -> "stopping…"
-                    },
-                    color = when (state) {
-                        ModuleState.ACTIVE -> MaterialTheme.colorScheme.primary
-                        ModuleState.ERROR -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            Spacer(Modifier.height(0.dp))
-        }
-    }
-}
-
-@Composable
-private fun PresetChip(
+private fun ModuleToggle(
     title: String,
     subtitle: String,
-    preset: PresetId,
-    vm: MainViewModel,
-    warnIfChanged: Boolean
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+    extra: @Composable () -> Unit = {}
 ) {
     Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall)
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = checked, onCheckedChange = onToggle)
             }
-            OutlinedButton(onClick = { vm.applyPreset(preset) }) { Text("Apply") }
+            extra()
         }
     }
 }
